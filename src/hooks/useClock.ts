@@ -1,39 +1,42 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useRef } from "react";
 import { bpmToPeriod } from "../utils";
+import { REFRESH_PERIOD } from "../constants";
 
 export const useAnimationFrame = (
   bpm: number,
-  nextAnimationFrameHandler: () => void,
-  shouldAnimate: boolean
+  action: () => void,
+  isPlaying: boolean,
+  audioContext: React.MutableRefObject<AudioContext | undefined>
 ) => {
-  const REFRESH_PERIOD = 20;
-  const frame = useRef(0);
+  const frame = useRef<number | null>(null);
 
   const animate = (oldTime: number) => {
-    if (performance.now() - oldTime + REFRESH_PERIOD / 2 >= bpmToPeriod(bpm)) {
-      console.log(
-        "mesured",
-        performance.now() - oldTime,
-        "theo",
-        bpmToPeriod(bpm)
-      );
+    const currentTime = audioContext.current!.currentTime * 1000;
+    const timeDiff = currentTime - oldTime;
 
-      nextAnimationFrameHandler();
-      frame.current = requestAnimationFrame(() => animate(performance.now()));
+    if (timeDiff + REFRESH_PERIOD / 2 >= bpmToPeriod(bpm)) {
+      action();
+      frame.current = requestAnimationFrame(() => animate(currentTime));
     } else {
       frame.current = requestAnimationFrame(() => animate(oldTime));
     }
   };
 
   useEffect(() => {
-    if (shouldAnimate) {
-      const initialTime = performance.now();
+    if (isPlaying && audioContext.current) {
+      const initialTime = audioContext.current.currentTime * 1000;
       frame.current = requestAnimationFrame(() => animate(initialTime));
     } else {
-      cancelAnimationFrame(frame.current);
+      if (frame.current !== null) {
+        cancelAnimationFrame(frame.current);
+      }
     }
 
-    return () => cancelAnimationFrame(frame.current);
-  }, [shouldAnimate, bpm]);
+    return () => {
+      if (frame.current !== null) {
+        cancelAnimationFrame(frame.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, bpm]);
 };

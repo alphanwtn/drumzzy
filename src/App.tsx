@@ -1,20 +1,23 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useAnimationFrame } from "./hooks/useClock";
+import { GRID_LENGTH } from "./constants";
 
 function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState<number>(100);
   const [led, setLed] = useState(false);
-  const [activeAudio, setActiveAudio] = useState(false);
+  const [grid, setGrid] = useState<boolean[]>(Array(GRID_LENGTH).fill(false));
+  const [currentBeat, setCurrentBeat] = useState<null | number>(null);
 
   const audioContext = useRef<AudioContext>();
   const kickBuffer = useRef<AudioBuffer>();
 
   function activateAudioCtxt() {
     audioContext.current = new AudioContext();
-    setActiveAudio(true);
   }
+
+  // const tab = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false]
 
   async function loadKick(url: string) {
     if (!audioContext.current) return;
@@ -34,25 +37,82 @@ function App() {
     }
   }
 
-  function playSound(buffer: AudioBuffer) {
+  function playSound(buffer: AudioBuffer, time?: number) {
     if (!audioContext.current) return;
     const source = audioContext.current.createBufferSource(); // creates a sound source
     source.buffer = buffer; // tell the source which sound to play
     source.connect(audioContext.current.destination); // connect the source to the context's destination (the speakers)
-    source.start(audioContext.current.currentTime); // play the source now
+    source.start(time); // time is relative to audiocontext
+  }
+
+  function handleCurrentBeat() {
+    setCurrentBeat((prev) => {
+      if (prev === null || prev + 1 === GRID_LENGTH) {
+        return 0;
+      } else {
+        return prev + 1;
+      }
+    });
+  }
+
+  function scheduleNote() {
+    if (!kickBuffer.current) return;
+    if (currentBeat === null && grid[0]) {
+      playSound(kickBuffer.current, 0.5);
+    }
+    if (currentBeat && grid[currentBeat + 1]) {
+      playSound(kickBuffer.current);
+    }
   }
 
   useEffect(() => {
     loadKick("samples/kick.wav");
-  }, [activeAudio]);
+    setCurrentBeat(null);
+    setGrid([
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  }, [isPlaying]);
 
   useAnimationFrame(
     bpm,
     () => {
       setLed((prev) => !prev);
-      if (kickBuffer.current) playSound(kickBuffer.current);
+      handleCurrentBeat();
+      scheduleNote();
     },
-    isPlaying
+    isPlaying,
+    audioContext
   );
 
   function handleBpmChange(e: ChangeEvent<HTMLInputElement>) {
@@ -71,6 +131,7 @@ function App() {
       <button
         onClick={() => {
           setIsPlaying((prev) => !prev);
+          activateAudioCtxt();
         }}
       >
         {isPlaying ? "⏸️ Pause" : "▶️ Play"}
@@ -81,14 +142,9 @@ function App() {
         value={bpm}
         onChange={handleBpmChange}
       />
-      <button
-        onClick={() => {
-          activateAudioCtxt();
-        }}
-      >
-        Activate audio {activeAudio && "🟢"}
-      </button>
-      <div>{led ? "🔴" : "⚫️"}</div>
+      <div>
+        {led ? "🔴" : "⚫️"} time: {currentBeat}
+      </div>
     </div>
   );
 }
