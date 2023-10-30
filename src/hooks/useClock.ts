@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { bpmToPeriod } from "../utils";
-import { REFRESH_PERIOD } from "../constants";
+import { LOOKAHEAD_TIME, EST_REFRESH_PERIOD } from "../constants";
 
 export const useAnimationFrame = (
   bpm: number,
@@ -14,7 +14,10 @@ export const useAnimationFrame = (
     const currentTime = audioContext.current!.currentTime * 1000;
     const timeDiff = currentTime - oldTime;
 
-    if (timeDiff + REFRESH_PERIOD / 2 >= bpmToPeriod(bpm)) {
+    if (
+      timeDiff + EST_REFRESH_PERIOD / 2 + LOOKAHEAD_TIME >=
+      bpmToPeriod(bpm)
+    ) {
       action();
       frame.current = requestAnimationFrame(() => animate(currentTime));
     } else {
@@ -38,5 +41,5 @@ export const useAnimationFrame = (
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, bpm]);
+  }, [isPlaying, bpm, action]);
 };

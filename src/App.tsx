@@ -1,13 +1,14 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { useAnimationFrame } from "./hooks/useClock";
-import { GRID_LENGTH } from "./constants";
+import { GRID_LENGTH, INIT_TEMPO } from "./constants";
+import { bpmToPeriod } from "./utils";
 
 function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState<number>(100);
   const [led, setLed] = useState(false);
-  const [grid, setGrid] = useState<boolean[]>(Array(GRID_LENGTH).fill(false));
+  const [grid, setGrid] = useState<boolean[]>(Array(GRID_LENGTH).fill(true));
   const [currentBeat, setCurrentBeat] = useState<null | number>(null);
 
   const audioContext = useRef<AudioContext>();
@@ -42,7 +43,7 @@ function App() {
     const source = audioContext.current.createBufferSource(); // creates a sound source
     source.buffer = buffer; // tell the source which sound to play
     source.connect(audioContext.current.destination); // connect the source to the context's destination (the speakers)
-    source.start(time); // time is relative to audiocontext
+    source.start(time); // time is relative to audiocontext / en secondes !!
   }
 
   function handleCurrentBeat() {
@@ -55,19 +56,47 @@ function App() {
     });
   }
 
-  function scheduleNote() {
+  function scheduleInitNote() {
     if (!kickBuffer.current) return;
     if (currentBeat === null && grid[0]) {
-      playSound(kickBuffer.current, 0.5);
-    }
-    if (currentBeat && grid[currentBeat + 1]) {
-      playSound(kickBuffer.current);
+      playSound(kickBuffer.current, INIT_TEMPO);
+      console.log("kick init");
     }
   }
 
+  function scheduleNote(): number | undefined {
+    console.log("time", audioContext.current?.currentTime);
+
+    if (!kickBuffer.current || currentBeat === null || !audioContext.current)
+      return;
+
+    if (currentBeat >= 0 && grid[currentBeat + 1]) {
+      playSound(
+        kickBuffer.current,
+        INIT_TEMPO + (bpmToPeriod(bpm) / 1000) * (currentBeat + 1)
+      );
+      console.log("schedule time", audioContext.current?.currentTime);
+      console.log(
+        "kick prog at : ",
+        INIT_TEMPO + (bpmToPeriod(bpm) / 1000) * (currentBeat + 1)
+      );
+    }
+
+    // retourne la diff entre le temps actuel et la programmation de la note
+    return (
+      audioContext.current.currentTime -
+      (INIT_TEMPO + (bpmToPeriod(bpm) / 1000) * (currentBeat + 1))
+    );
+  }
+
   useEffect(() => {
+    activateAudioCtxt();
     loadKick("samples/kick.wav");
+  }, []);
+
+  useEffect(() => {
     setCurrentBeat(null);
+    scheduleInitNote();
     setGrid([
       true,
       true,
@@ -107,9 +136,9 @@ function App() {
   useAnimationFrame(
     bpm,
     () => {
+      scheduleNote();
       setLed((prev) => !prev);
       handleCurrentBeat();
-      scheduleNote();
     },
     isPlaying,
     audioContext
@@ -129,9 +158,8 @@ function App() {
         Play once
       </button>
       <button
-        onClick={() => {
+        onClick={async () => {
           setIsPlaying((prev) => !prev);
-          activateAudioCtxt();
         }}
       >
         {isPlaying ? "⏸️ Pause" : "▶️ Play"}
