@@ -14,10 +14,7 @@ export const useAnimationFrame = (
     const currentTime = audioContext.current!.currentTime * 1000;
     const timeDiff = currentTime - oldTime;
 
-    if (
-      timeDiff + EST_REFRESH_PERIOD / 2 + LOOKAHEAD_TIME >=
-      bpmToPeriod(bpm)
-    ) {
+    if (timeDiff + EST_REFRESH_PERIOD / 2 + LOOKAHEAD_TIME >= bpmToPeriod(bpm)) {
       action();
       frame.current = requestAnimationFrame(() => animate(currentTime));
     } else {
@@ -41,5 +38,5 @@ export const useAnimationFrame = (
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, bpm, action]);
+  }, [isPlaying, bpm]);
 };
